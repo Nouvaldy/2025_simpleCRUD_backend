@@ -1,16 +1,12 @@
 {
-    "name": "hapi-vercel-api",
+    "name": "simple-crud-api",
     "version": "1.0.0",
-    "main": "api/index.js",
+    "type": "module",
     "scripts": {
         "dev": "vercel dev",
-        "build": "echo 'Build complete'",
-        "start": "node api/index.js"
-    },
-    "dependencies": {
-        "@hapi/hapi": "^21.3.2"
+        "build": "echo 'Build complete'"
     },
     "engines": {
-        "node": "22.x"
+        "node": "18.x"
     }
 }
