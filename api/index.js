@@ -1,3 +1,4 @@
+// api/index.js - Main API handler
 const Hapi = require('@hapi/hapi');
 
 // Sample routes
@@ -11,9 +12,8 @@ const routes = [
     },
     {
         method: 'GET',
-        path: '/api/users',
+        path: '/users',
         handler: (request, h) => {
-            // Sample data
             return {
                 users: [
                     { id: 1, name: 'John Doe', email: 'john@example.com' },
@@ -24,7 +24,7 @@ const routes = [
     },
     {
         method: 'POST',
-        path: '/api/users',
+        path: '/users',
         handler: (request, h) => {
             const { name, email } = request.payload;
             return {
@@ -35,7 +35,7 @@ const routes = [
     },
     {
         method: 'PUT',
-        path: '/api/users/{id}',
+        path: '/users/{id}',
         handler: (request, h) => {
             const { id } = request.params;
             const { name, email } = request.payload;
@@ -47,7 +47,7 @@ const routes = [
     },
     {
         method: 'DELETE',
-        path: '/api/users/{id}',
+        path: '/users/{id}',
         handler: (request, h) => {
             const { id } = request.params;
             return { message: `User ${id} deleted` };
@@ -55,41 +55,64 @@ const routes = [
     }
 ];
 
-// Serverless handler untuk Vercel
+// Serverless handler for Vercel
 module.exports = async (req, res) => {
-    const server = Hapi.server({
-        host: '0.0.0.0',
-        port: process.env.PORT || 3000,
-        routes: {
-            cors: {
-                origin: ['*'], // Allow all origins for development
-                headers: ['Accept', 'Content-Type'],
-                additionalHeaders: ['X-Requested-With']
+    try {
+        const server = Hapi.server({
+            host: '0.0.0.0',
+            port: process.env.PORT || 3000,
+            routes: {
+                cors: {
+                    origin: ['*'],
+                    headers: ['Accept', 'Content-Type', 'Authorization'],
+                    additionalHeaders: ['X-Requested-With']
+                }
+            }
+        });
+
+        // Add routes
+        server.route(routes);
+
+        // Initialize server
+        await server.initialize();
+
+        // Parse request body for POST/PUT requests
+        let payload;
+        if (req.method !== 'GET' && req.method !== 'DELETE') {
+            payload = '';
+            req.on('data', chunk => {
+                payload += chunk.toString();
+            });
+            await new Promise(resolve => {
+                req.on('end', resolve);
+            });
+            try {
+                payload = JSON.parse(payload);
+            } catch (e) {
+                payload = {};
             }
         }
-    });
 
-    // Add routes
-    server.route(routes);
+        // Handle the request
+        const response = await server.inject({
+            method: req.method,
+            url: req.url,
+            headers: req.headers,
+            payload: payload
+        });
 
-    // Initialize server
-    await server.initialize();
-
-    // Handle the request
-    const { method, url, headers, body } = req;
-    
-    const response = await server.inject({
-        method: method,
-        url: url,
-        headers: headers,
-        payload: method !== 'GET' && method !== 'DELETE' ? body : undefined
-    });
-
-    // Set response headers
-    Object.keys(response.headers).forEach(key => {
-        res.setHeader(key, response.headers[key]);
-    });
-
-    res.statusCode = response.statusCode;
-    res.end(response.payload);
+        // Set response headers
+        Object.keys(response.headers).forEach(key => {
+            res.setHeader(key, response.headers[key]);
+        });
+        
+        res.statusCode = response.statusCode;
+        res.end(response.payload);
+        
+    } catch (error) {
+        console.error('Server error:', error);
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ error: 'Internal Server Error' }));
+    }
 };
